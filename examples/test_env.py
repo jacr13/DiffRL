@@ -35,8 +35,10 @@ seeding()
 
 env_fn = getattr(envs, args.env)
 
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+
 env = env_fn(num_envs = args.num_envs, \
-            device = 'cuda:0', \
+            device = device, \
             render = args.render, \
             seed = 0, \
             stochastic_init = True, \
@@ -56,6 +58,9 @@ for i in range(1000):
     reward_episode += reward
 
 t_end = time.time()
+
+if hasattr(env, 'renderer'):
+    env.renderer.save()
 
 print('fps = ', 1000 * args.num_envs / (t_end - t_start))
 print('mean reward = ', reward_episode.mean().detach().cpu().item())
