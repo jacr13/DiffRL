@@ -29,11 +29,11 @@ from utils import torch_utils as tu
 
 class AntEnv(DFlexEnv):
 
-    def __init__(self, render=False, device='cuda:0', num_envs=4096, seed=0, episode_length=1000, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, early_termination = True):
+    def __init__(self, render=False, device='cuda:0', num_envs=4096, seed=0, episode_length=1000, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, early_termination = True, no_env_offset = False):
         num_obs = 37
         num_act = 8
     
-        super(AntEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device)
+        super(AntEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device, no_env_offset)
 
         self.stochastic_init = stochastic_init
         self.early_termination = early_termination
@@ -92,7 +92,7 @@ class AntEnv(DFlexEnv):
         self.start_joint_q = [0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0]
         self.start_joint_target = [0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 0.0, 1.0]
 
-        if self.visualize:
+        if not self.no_env_offset:
             self.env_dist = 2.5
         else:
             self.env_dist = 0. # set to zero for training for numerical consistency

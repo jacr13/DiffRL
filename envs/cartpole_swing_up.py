@@ -29,12 +29,12 @@ from utils import torch_utils as tu
 
 class CartPoleSwingUpEnv(DFlexEnv):
 
-    def __init__(self, render=False, device='cuda:0', num_envs=1024, seed=0, episode_length=240, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, early_termination = False):
+    def __init__(self, render=False, device='cuda:0', num_envs=1024, seed=0, episode_length=240, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, early_termination = False, no_env_offset = False):
 
         num_obs = 5
         num_act = 1
 
-        super(CartPoleSwingUpEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device)
+        super(CartPoleSwingUpEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device, no_env_offset)
 
         self.stochastic_init = stochastic_init
         self.early_termination = early_termination
@@ -72,7 +72,7 @@ class CartPoleSwingUpEnv(DFlexEnv):
         self.sim_substeps = 4
         self.sim_dt = self.dt
 
-        if self.visualize:
+        if not self.no_env_offset:
             self.env_dist = 1.0
         else:
             self.env_dist = 0.0

@@ -20,7 +20,7 @@ from gym import spaces
 
 class DFlexEnv:
     
-    def __init__(self, num_envs, num_obs, num_act, episode_length, MM_caching_frequency = 1, seed=0, no_grad=True, render=False, device='cuda:0'):
+    def __init__(self, num_envs, num_obs, num_act, episode_length, MM_caching_frequency = 1, seed=0, no_grad=True, render=False, device='cuda:0', no_env_offset=True):
         self.seed = seed
 
         self.no_grad = no_grad
@@ -31,6 +31,7 @@ class DFlexEnv:
         self.device = device
 
         self.visualize = render
+        self.no_env_offset = no_env_offset
 
         self.sim_time = 0.0
 

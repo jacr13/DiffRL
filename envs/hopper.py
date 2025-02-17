@@ -29,11 +29,11 @@ from utils import torch_utils as tu
 
 class HopperEnv(DFlexEnv):
 
-    def __init__(self, render=False, device='cuda:0', num_envs=4096, seed=0, episode_length=1000, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, early_termination = True):
+    def __init__(self, render=False, device='cuda:0', num_envs=4096, seed=0, episode_length=1000, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, early_termination = True, no_env_offset = False):
         num_obs = 11
         num_act = 3
     
-        super(HopperEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device)
+        super(HopperEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device, no_env_offset)
 
         self.stochastic_init = stochastic_init
         self.early_termination = early_termination

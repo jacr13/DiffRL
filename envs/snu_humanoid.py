@@ -29,7 +29,7 @@ from utils import torch_utils as tu
 
 class SNUHumanoidEnv(DFlexEnv):
 
-    def __init__(self, render=False, device='cuda:0', num_envs=4096, seed=0, episode_length=1000, no_grad=True, stochastic_init=False, MM_caching_frequency = 1):
+    def __init__(self, render=False, device='cuda:0', num_envs=4096, seed=0, episode_length=1000, no_grad=True, stochastic_init=False, MM_caching_frequency = 1, no_env_offset = False):
 
         self.filter = { "Pelvis", "FemurR", "TibiaR", "TalusR", "FootThumbR", "FootPinkyR", "FemurL", "TibiaL", "TalusL", "FootThumbL", "FootPinkyL"}
 
@@ -58,7 +58,7 @@ class SNUHumanoidEnv(DFlexEnv):
         if self.mtu_actuations:
             num_act = self.num_muscles
         
-        super(SNUHumanoidEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device)
+        super(SNUHumanoidEnv, self).__init__(num_envs, num_obs, num_act, episode_length, MM_caching_frequency, seed, no_grad, render, device, no_env_offset)
 
         self.stochastic_init = stochastic_init
 
@@ -121,7 +121,7 @@ class SNUHumanoidEnv(DFlexEnv):
 
         self.start_pos = []
 
-        if self.visualize:
+        if not self.no_env_offset:
             self.env_dist = 2.0
         else:
             self.env_dist = 0. # set to zero for training for numerical consistency
