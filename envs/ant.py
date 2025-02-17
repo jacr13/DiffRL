@@ -56,6 +56,7 @@ class AntEnv(DFlexEnv):
             self.renderer.draw_springs = True
             self.renderer.draw_shapes = True
             self.render_time = 0.0
+            self.renderer.save = lambda: self.stage.Save()
 
     def init_sim(self):
         self.builder = df.sim.ModelBuilder()
@@ -139,13 +140,13 @@ class AntEnv(DFlexEnv):
         if (self.model.ground):
             self.model.collide(self.state)
 
-    def render(self, mode = 'human'):
+    def render(self, mode = 'human', save = True):
         if self.visualize:
             self.render_time += self.dt
             self.renderer.update(self.state, self.render_time)
 
             render_interval = 1
-            if (self.num_frames == render_interval):
+            if save and (self.num_frames == render_interval):
                 try:
                     self.stage.Save()
                 except:
@@ -183,9 +184,9 @@ class AntEnv(DFlexEnv):
                 }
 
         if len(env_ids) > 0:
-           self.reset(env_ids)
+            self.reset(env_ids)
 
-        self.render()
+        self.render(save=False)
 
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
     
@@ -212,7 +213,7 @@ class AntEnv(DFlexEnv):
                 axis = torch.nn.functional.normalize(torch.rand((len(env_ids), 3), device = self.device) - 0.5)
                 self.state.joint_q.view(self.num_envs, -1)[env_ids, 3:7] = tu.quat_mul(self.state.joint_q.view(self.num_envs, -1)[env_ids, 3:7], tu.quat_from_angle_axis(angle, axis))
                 self.state.joint_q.view(self.num_envs, -1)[env_ids, 7:] = self.state.joint_q.view(self.num_envs, -1)[env_ids, 7:] + 0.2 * (torch.rand(size=(len(env_ids), self.num_joint_q - 7), device = self.device) - 0.5) * 2.
-                self.state.joint_qd.view(self.num_envs, -1)[env_ids, :] = 0.5 * (torch.rand(size=(len(env_ids), 14), device=self.device) - 0.5)
+                self.state.joint_qd.view(self.num_envs, -1)[env_ids, :] = 0.5 * (torch.rand(size=(len(env_ids), self.num_joint_qd), device=self.device) - 0.5)
 
             # clear action
             self.actions = self.actions.clone()

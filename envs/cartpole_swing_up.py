@@ -63,6 +63,7 @@ class CartPoleSwingUpEnv(DFlexEnv):
             self.renderer.draw_springs = True
             self.renderer.draw_shapes = True
             self.render_time = 0.0
+            self.renderer.save = lambda: self.stage.Save()
 
     def init_sim(self):
         self.builder = df.sim.ModelBuilder()
@@ -99,16 +100,19 @@ class CartPoleSwingUpEnv(DFlexEnv):
         self.start_joint_q = self.state.joint_q.clone()
         self.start_joint_qd = self.state.joint_qd.clone()
 
-    def render(self, mode = 'human'):
+    def render(self, mode = 'human', save = True):
         if self.visualize:
             self.render_time += self.dt
             self.renderer.update(self.state, self.render_time)
-            if (self.num_frames == 40):
+
+            render_interval = 1
+            if save and (self.num_frames == render_interval):
                 try:
                     self.stage.Save()
                 except:
                     print('USD save error')
-                self.num_frames -= 40
+
+                self.num_frames -= render_interval
     
     def step(self, actions):
         with df.ScopedTimer("simulate", active=False, detailed=False):
@@ -146,7 +150,7 @@ class CartPoleSwingUpEnv(DFlexEnv):
                 self.reset(env_ids)
         
         with df.ScopedTimer("render", active=False, detailed=False):
-            self.render()
+            self.render(save=False)
 
         #self.extras = {'obs_before_reset': self.obs_buf_before_reset}
         

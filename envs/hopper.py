@@ -5,7 +5,6 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-#from numpy.lib.function_base import angle
 from envs.dflex_env import DFlexEnv
 import math
 import torch
@@ -13,8 +12,6 @@ import torch
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from copy import deepcopy
 
 import dflex as df
 
@@ -62,6 +59,7 @@ class HopperEnv(DFlexEnv):
             self.renderer.draw_springs = True
             self.renderer.draw_shapes = True
             self.render_time = 0.0
+            self.renderer.save = lambda: self.stage.Save()
 
     def init_sim(self):
         self.builder = df.sim.ModelBuilder()
@@ -134,13 +132,13 @@ class HopperEnv(DFlexEnv):
         if (self.model.ground):
             self.model.collide(self.state)
 
-    def render(self, mode = 'human'):
+    def render(self, mode = 'human', save = True):
         if self.visualize:
             self.render_time += self.dt
             self.renderer.update(self.state, self.render_time)
 
             render_interval = 1
-            if (self.num_frames == render_interval):
+            if save and (self.num_frames == render_interval):
                 try:
                     self.stage.Save()
                 except:
@@ -178,9 +176,9 @@ class HopperEnv(DFlexEnv):
                 }
 
         if len(env_ids) > 0:
-           self.reset(env_ids)
+            self.reset(env_ids)
 
-        self.render()
+        self.render(save=False)
 
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
     

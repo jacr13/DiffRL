@@ -75,13 +75,21 @@ class SNUHumanoidEnv(DFlexEnv):
         #-----------------------
         # set up Usd renderer
         if (self.visualize):
-            self.stage = Usd.Stage.CreateNew("outputs/" + self.name + "HumanoidSNU_Low_" + str(self.num_envs) + ".usd")
+            self.stage = Usd.Stage.CreateNew("outputs/" + "SNUHumanoid_" + str(self.num_envs) + ".usd")
 
             self.renderer = df.render.UsdRenderer(self.model, self.stage)
             self.renderer.draw_points = True
             self.renderer.draw_springs = True
             self.renderer.draw_shapes = True
             self.render_time = 0.0
+            self.renderer.save = lambda: self.stage.Save()
+
+            self.render_muscles_only = True
+            if self.render_muscles_only:
+                prims = list(self.stage.Traverse())
+                prims = list(filter(lambda prim: prim.GetTypeName() == 'Xform' and 'body' in prim.GetName(), prims))
+                for prim in prims:
+                    self.stage.RemovePrim(prim.GetPath())
 
     def init_sim(self):
         self.builder = df.sim.ModelBuilder()
@@ -194,7 +202,7 @@ class SNUHumanoidEnv(DFlexEnv):
         if (self.model.ground):
             self.model.collide(self.state)
 
-    def render(self, mode = 'human'):
+    def render(self, mode = 'human', save = True):
 
         if self.visualize:
             with torch.no_grad():
@@ -234,9 +242,15 @@ class SNUHumanoidEnv(DFlexEnv):
                     skel_index += 1
 
             self.render_time += self.dt * self.inv_control_freq
-            self.renderer.update(self.state, self.render_time)
+            if self.render_muscles_only:
+                try:
+                    self.stage.SetEndTimeCode(self.render_time)
+                except:
+                    pass
+            else:
+                self.renderer.update(self.state, self.render_time)
 
-            if (self.num_frames == 1):
+            if save and (self.num_frames == 1):
                 try:
                     self.stage.Save()
                 except:
@@ -293,10 +307,10 @@ class SNUHumanoidEnv(DFlexEnv):
                 }
 
         if len(env_ids) > 0:
-           self.reset(env_ids)
+            self.reset(env_ids)
 
         with df.ScopedTimer("render", False):
-            self.render()
+            self.render(save=False)
 
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
     

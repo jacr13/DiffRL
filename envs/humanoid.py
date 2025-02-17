@@ -83,6 +83,7 @@ class HumanoidEnv(DFlexEnv):
             self.renderer.draw_springs = True
             self.renderer.draw_shapes = True
             self.render_time = 0.0
+            self.renderer.save = lambda: self.stage.Save()
 
     def init_sim(self):
         self.builder = df.sim.ModelBuilder()
@@ -173,12 +174,12 @@ class HumanoidEnv(DFlexEnv):
         if (self.model.ground):
             self.model.collide(self.state)
 
-    def render(self, mode = 'human'):
+    def render(self, mode = 'human', save = True):
         if self.visualize:
             self.render_time += self.dt
             self.renderer.update(self.state, self.render_time)
 
-            if (self.num_frames == 1):
+            if save and (self.num_frames == 1):
                 try:
                     self.stage.Save()
                 except:
@@ -231,9 +232,9 @@ class HumanoidEnv(DFlexEnv):
                 }
 
         if len(env_ids) > 0:
-           self.reset(env_ids)
+            self.reset(env_ids)
 
-        self.render()
+        self.render(save=False)
 
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
     
