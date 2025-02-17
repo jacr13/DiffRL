@@ -1857,8 +1857,18 @@ def compile():
         cpp_flags = ["-Z", "-O2", "-DNDEBUG"]
         ld_flags = ["-DNDEBUG"]
 
+    # cuda9_flag = "-gencode=arch=compute_70,code=compute_70 "
+    # cuda10_flag = "-gencode=arch=compute_75,code=compute_75 "
+    # cuda11_flag = "-gencode=arch=compute_80,code=compute_80 "
+    cuda12_flag = "-gencode=arch=compute_90,code=compute_90 "
+    # cuda13_flag = "-gencode=arch=compute_120,code=compute_120 "
+
     # just use minimum to ensure compatability
-    cuda_flags = ['-gencode=arch=compute_35,code=compute_35']
+    cuda_flags = [
+        cuda12_flag +
+        "-I/usr/local/cuda/include " +
+        "-L/usr/local/cuda/lib64 "
+    ]
 
     # release config
     if use_cuda:
