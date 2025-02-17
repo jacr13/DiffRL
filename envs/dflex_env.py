@@ -70,6 +70,14 @@ class DFlexEnv:
         return self.num_agents
 
     @property
+    def max_episode_steps(self):
+        return self.episode_length
+
+    @property
+    def max_episode_length(self):
+        return self.episode_length
+
+    @property
     def observation_space(self):
         return self.obs_space
 
