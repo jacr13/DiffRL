@@ -172,8 +172,13 @@ class HopperEnv(DFlexEnv):
             self.obs_buf_before_reset = self.obs_buf.clone()
             self.extras = {
                 'obs_before_reset': self.obs_buf_before_reset,
-                'episode_end': self.termination_buf
-                }
+                'time_outs': self.progress_buf > self.episode_length - 1,
+                # 'episode_end': self.termination_buf
+            }
+        else:
+            self.extras = {
+                'time_outs': self.progress_buf > self.episode_length - 1,
+            }
 
         if len(env_ids) > 0:
             self.reset(env_ids)
