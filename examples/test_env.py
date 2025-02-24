@@ -53,7 +53,7 @@ t_start = time.time()
 
 reward_episode = 0.
 for i in range(1000):
-    actions = torch.randn((args.num_envs, num_actions), device = 'cuda:0')
+    actions = torch.randn((args.num_envs, num_actions), device = device)
     obs, reward, done, info = env.step(actions)
     reward_episode += reward
 
