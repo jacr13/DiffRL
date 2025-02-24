@@ -1,1 +1,2 @@
 recursive-include dflex/dflex *.h *.cpp *.m
+recursive-include envs/assets *

@@ -8,8 +8,8 @@
 from setuptools import find_packages, setup
 
 packages = find_packages(where="dflex")
-packages += find_packages(exclude=["envs*", "examples*"]) + ["dflex.envs", "dflex.examples"]
-package_dir = {"": "dflex", "dflex.envs": "envs", "dflex.examples": "examples"}
+packages += find_packages(exclude=["envs*", "utils*", "examples*"]) + ["dflex.envs", "dflex.utils", "dflex.examples"]
+package_dir = {"": "dflex", "dflex.envs": "envs", "dflex.utils": "utils", "dflex.examples": "examples"}
 
 setup(
     name="dflex",
