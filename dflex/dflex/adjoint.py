@@ -5,19 +5,18 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-import ast
-import copy
-import imp
-import inspect
-import math
 import os
+import importlib
+import sys
+import ast
+import math
+import inspect
 import typing
 import weakref
-
-import dflex.config
-import numpy as np
 import torch
 import torch.utils.cpp_extension
+
+import dflex.config
 
 # Todo
 # -----
@@ -661,7 +660,6 @@ class PrintFunc:
 
 class Var:
     def __init__(adj, label, type, requires_grad=False, constant=None):
-
         adj.label = label
         adj.type = type
         adj.requires_grad = requires_grad
@@ -706,7 +704,6 @@ class Stmt:
 
 class Adjoint:
     def __init__(adj, func, device="cpu"):
-
         adj.func = func
         adj.device = device
 
@@ -747,7 +744,6 @@ class Adjoint:
 
     # code generation methods
     def format_template(adj, template, input_vars, output_var):
-
         # output var is always the 0th index
         args = [output_var] + input_vars
         s = template.format(*args)
@@ -774,14 +770,12 @@ class Adjoint:
         return v
 
     def add_constant(adj, n):
-
         output = adj.add_var(type=type(n), constant=n)
 
         # adj.add_forward("var_{} = {};".format(output, n))
         return output
 
     def add_load(adj, input):
-
         output = adj.add_var(input.type)
 
         adj.add_forward("var_{} = {};".format(output, input))
@@ -790,7 +784,6 @@ class Adjoint:
         return output
 
     def add_operator(adj, op, inputs):
-
         # todo: just using first input as the output type, would need some
         # type inference here to support things like float3 = float*float3
 
@@ -835,7 +828,6 @@ class Adjoint:
     def add_call(adj, func, inputs, prefix="df::"):
         # expression (zero output), e.g.: tid()
         if func.value_type(inputs) == None:
-
             forward_call = prefix + "{}({});".format(
                 func.key, adj.format_args("var_", inputs)
             )
@@ -853,7 +845,6 @@ class Adjoint:
 
         # function (one output)
         else:
-
             output = adj.add_var(func.value_type(inputs))
 
             forward_call = (
@@ -875,7 +866,6 @@ class Adjoint:
             return output
 
     def add_return(adj, var):
-
         if var == None:
             adj.add_forward(
                 "return;".format(var), "goto label{};".format(adj.label_count)
@@ -892,14 +882,12 @@ class Adjoint:
 
     # define an if statement
     def begin_if(adj, cond):
-
         adj.add_forward("if (var_{}) {{".format(cond))
         adj.add_reverse("}")
 
         adj.indent_count += 1
 
     def end_if(adj, cond):
-
         adj.indent_count -= 1
 
         adj.add_forward("}")
@@ -907,7 +895,6 @@ class Adjoint:
 
     # define a for-loop
     def begin_for(adj, iter, start, end):
-
         # note that dynamic for-loops must not mutate any previous state, so we don't need to re-run them in the reverse pass
         adj.add_forward(
             "for (var_{0}=var_{1}; var_{0} < var_{2}; ++var_{0}) {{".format(
@@ -920,7 +907,6 @@ class Adjoint:
         adj.indent_count += 1
 
     def end_for(adj, iter, start, end):
-
         adj.indent_count -= 1
 
         adj.add_forward("}")
@@ -932,7 +918,6 @@ class Adjoint:
 
     # append a statement to the forward pass
     def add_forward(adj, statement, statement_replay=None):
-
         prefix = ""
         for i in range(adj.indent_count):
             prefix += "\t"
@@ -947,7 +932,6 @@ class Adjoint:
 
     # append a statement to the reverse pass
     def add_reverse(adj, statement):
-
         prefix = ""
         for i in range(adj.indent_count):
             prefix += "\t"
@@ -955,11 +939,8 @@ class Adjoint:
         adj.body_reverse.append(prefix + statement)
 
     def eval(adj, node):
-
         try:
-
             if isinstance(node, ast.FunctionDef):
-
                 out = None
                 for f in node.body:
                     out = adj.eval(f)
@@ -989,7 +970,6 @@ class Adjoint:
                 return out
 
             elif isinstance(node, ast.If):  # if statement
-
                 if len(node.orelse) != 0:
                     raise SyntaxError("Else statements not currently supported")
 
@@ -1012,7 +992,6 @@ class Adjoint:
 
                 # detect symbols with conflicting definitions (assigned inside the branch)
                 for items in symbols_prev.items():
-
                     sym = items[0]
                     var1 = items[1]
                     var2 = adj.symbols[sym]
@@ -1063,7 +1042,6 @@ class Adjoint:
                     raise KeyError("Referencing undefined symbol: " + str(node.id))
 
             elif isinstance(node, ast.Num):
-
                 # lookup constant, if it has already been assigned then return existing var
                 # currently disabled, since assigning constant in a branch means it
                 key = (node.n, type(node.n))
@@ -1097,7 +1075,6 @@ class Adjoint:
                 return out
 
             elif isinstance(node, ast.For):
-
                 if len(node.iter.args) != 2:
                     raise Exception(
                         "For loop ranges must be of form range(start, end) with both start and end specified and no skip specifier."
@@ -1111,13 +1088,11 @@ class Adjoint:
                         break
 
                 if unroll:
-
                     # constant loop, unroll
                     start = node.iter.args[0].n
                     end = node.iter.args[1].n
 
                     for i in range(start, end):
-
                         var_iter = adj.add_constant(i)
                         adj.symbols[node.target.id] = var_iter
 
@@ -1125,7 +1100,6 @@ class Adjoint:
                         for s in node.body:
                             adj.eval(s)
                 else:
-
                     # dynamic loop, body must be side-effect free, i.e.: not
                     # overwrite memory locations used by previous operations
                     start = adj.eval(node.iter.args[0])
@@ -1147,7 +1121,6 @@ class Adjoint:
                 return adj.eval(node.value)
 
             elif isinstance(node, ast.Call):
-
                 name = None
 
                 # determine if call is to a builtin (attribute), or to a user-func (name)
@@ -1229,7 +1202,6 @@ class Adjoint:
                 print("[WARNING] ast node of type {} not supported".format(type(node)))
 
         except Exception as e:
-
             # print error / line number
             lines = adj.source.splitlines()
             print(
@@ -1559,7 +1531,6 @@ def codegen_func_reverse(adj, func_type="kernel", device="cpu"):
 
 
 def codegen_func(adj, device="cpu"):
-
     # forward header
     # return_type = "void"
 
@@ -1642,7 +1613,6 @@ def codegen_func(adj, device="cpu"):
 
 
 def codegen_kernel(adj, device="cpu"):
-
     forward_args = ""
     reverse_args = ""
 
@@ -1684,7 +1654,6 @@ def codegen_kernel(adj, device="cpu"):
 
 
 def codegen_module(adj, device="cpu"):
-
     forward_args = ""
     reverse_args = ""
 
@@ -1731,7 +1700,6 @@ def codegen_module(adj, device="cpu"):
 
 
 def codegen_module_decl(adj, device="cpu"):
-
     forward_args = ""
     reverse_args = ""
 
@@ -1792,13 +1760,18 @@ def set_build_env():
 
 
 def import_module(module_name, path):
-
     # https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path
-    file, path, description = imp.find_module(module_name, [path])
+    # fixing missing imp in py3.12 from https://discuss.python.org/t/how-do-i-migrate-from-imp/27885/16
+    spec = importlib.machinery.PathFinder.find_spec(module_name, [path])
+    if spec is None:
+        raise ImportError(
+            "Trying to import non-existent module '{}'".format(module_name)
+        )
 
-    # Close the .so file after load.
-    with file:
-        return imp.load_module(module_name, file, path, description)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    sys.modules[spec.name] = module
+    return module
 
 
 def rename(name, return_type):
@@ -1834,15 +1807,12 @@ def func(f):
 
 
 def kernel(f):
-
     # stores source and compiled entry points for a kernel (will be populated after module loads)
     class Kernel:
         def __init__(self, f):
-
             self.func = f
 
         def register(self, module):
-
             # lookup entry points based on name
             self.forward_cpu = eval("module." + self.func.__name__ + "_cpu_forward")
             self.backward_cpu = eval("module." + self.func.__name__ + "_cpu_backward")
@@ -1936,7 +1906,6 @@ def compile():
 
     # test cache
     if os.path.exists(cache_file):
-
         f = open(cache_file, "r")
 
         cache_string = f.read()
@@ -1974,19 +1943,8 @@ def compile():
         cpp_flags = ["-Z", "-O2", "-DNDEBUG"]
         ld_flags = ["-DNDEBUG"]
 
-    # cuda9_flag = "-gencode=arch=compute_70,code=compute_70 "
-    # cuda10_flag = "-gencode=arch=compute_75,code=compute_75 "
-    # cuda11_flag = "-gencode=arch=compute_80,code=compute_80 "
-    cuda12_flag = "-gencode=arch=compute_90,code=compute_90 "
-    # cuda13_flag = "-gencode=arch=compute_120,code=compute_120 "
-
     # just use minimum to ensure compatability
-    cuda_flags = ["-gencode=arch=compute_35,code=compute_35"]
-    # cuda_flags = [
-    #     cuda12_flag +
-    #     "-I/usr/local/cuda/include " +
-    #     "-L/usr/local/cuda/lib64 "
-    # ]
+    cuda_flags = ["-gencode=arch=compute_50,code=compute_50"]
 
     # release config
     if use_cuda:
@@ -2035,7 +1993,6 @@ def compile():
 
 
 def check_adapter(l, a):
-
     for t in l:
         if torch.is_tensor(t):
             assert t.device.type == a
@@ -2069,7 +2026,6 @@ def filter_grads(grads):
 
 
 def make_empty(outputs, device):
-
     empty = []
 
     for o in outputs:
@@ -2079,7 +2035,6 @@ def make_empty(outputs, device):
 
 
 def make_contiguous(grads):
-
     ret = []
     for g in grads:
         ret.append(g.contiguous())
@@ -2164,7 +2119,6 @@ def launch_torch(
     check_grad=False,
     no_grad=False,
 ):
-
     num_inputs = len(inputs)
     num_outputs = len(outputs)
 
@@ -2172,7 +2126,6 @@ def launch_torch(
     class TorchFunc(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *args):
-
             # local_inputs = args[0:num_inputs]
             # local_outputs = args[num_inputs:len(args)]
 
@@ -2202,7 +2155,6 @@ def launch_torch(
 
         @staticmethod
         def backward(ctx, *grads):
-
             # ensure grads are contiguous in memory
             adj_outputs = make_contiguous(grads)
 
@@ -2281,7 +2233,6 @@ def launch_torch(
 
 class Tape:
     def __init__(self):
-
         self.launches = []
 
         # dictionary mapping Tensor inputs to their adjoint
@@ -2297,9 +2248,7 @@ class Tape:
         preserve_output=False,
         skip_check_grad=False,
     ):
-
         if dim > 0:
-
             # run kernel
             if adapter == "cpu":
                 func.forward_cpu(*[dim, *inputs, *outputs])
@@ -2320,7 +2269,6 @@ class Tape:
 
             # optionally run grad check
             if dflex.config.check_grad == True and skip_check_grad == False:
-
                 # copy inputs and outputs to avoid disturbing the computational graph
                 inputs_copy = copy_params(inputs)
                 outputs_copy = copy_params(outputs)
@@ -2336,9 +2284,7 @@ class Tape:
                 )
 
     def replay(self):
-
         for kernel in reversed(self.launches):
-
             func = kernel[0]
             dim = kernel[1]
             inputs = kernel[2]
@@ -2352,7 +2298,6 @@ class Tape:
 
             # build input adjoints
             for i in inputs:
-
                 if i in self.adjoints:
                     adj_inputs.append(self.adjoints[i])
                 else:
@@ -2385,12 +2330,16 @@ class Tape:
                 check_finite(adj_outputs)
 
     def reset(self):
-
         self.adjoints = {}
         self.launches = []
 
-    def alloc_grad(self, t):
+    def zero(self):
+        # print("Adjoint len", len(self.adjoints))
 
+        for k, v in self.adjoints.items():
+            self.adjoints[k] = torch.zeros_like(v)
+
+    def alloc_grad(self, t):
         if t.dtype == torch.float32 and t.requires_grad:
             # zero tensor
             self.adjoints[t] = torch.zeros_like(t)
@@ -2427,7 +2376,6 @@ def alloc_grads(inputs, adapter):
 
 
 def matmul(tape, m, n, k, t1, t2, A, B, C, adapter):
-
     if adapter == "cpu":
         threads = 1
     else:
@@ -2454,7 +2402,6 @@ def matmul(tape, m, n, k, t1, t2, A, B, C, adapter):
 def matmul_batched(
     tape, batch_count, m, n, k, t1, t2, A_start, B_start, C_start, A, B, C, adapter
 ):
-
     if adapter == "cpu":
         threads = batch_count
     else:
