@@ -5,23 +5,22 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-import os
-import imp
 import ast
-import math
+import copy
+import imp
 import inspect
+import math
+import os
 import typing
 import weakref
+
+import dflex.config
 import numpy as np
 import torch
 import torch.utils.cpp_extension
 
-import dflex.config
-
-import copy
-
 # Todo
-#-----
+# -----
 #
 # [ ] Unary ops (e.g.: -)
 # [ ] Inplace ops (e.g.: +=, -=)
@@ -37,7 +36,7 @@ functions = {}
 cuda_functions = {}
 kernels = {}
 
-#----------------------
+# ----------------------
 # built-in types
 
 
@@ -87,7 +86,7 @@ class spatial_matrix:
 class spatial_transform:
     def __init__(self):
         pass
-    
+
 
 class void:
     def __init__(self):
@@ -101,7 +100,7 @@ class tensor:
         self.__name__ = "tensor<" + type.__name__ + ">"
 
 
-#----------------------
+# ----------------------
 
 
 # register built-in function
@@ -115,7 +114,7 @@ def builtin(key):
     return insert
 
 
-#---------------------------------
+# ---------------------------------
 # built-in operators +,-,*,/
 
 
@@ -145,9 +144,9 @@ class MulFunc:
     @staticmethod
     def value_type(args):
         # todo: encode type operator type globally
-        if (args[0].type == mat33 and args[1].type == float3):            
+        if args[0].type == mat33 and args[1].type == float3:
             return float3
-        if (args[0].type == spatial_matrix and args[1].type == spatial_vector):
+        if args[0].type == spatial_matrix and args[1].type == spatial_vector:
             return spatial_vector
         else:
             return args[0].type
@@ -160,7 +159,7 @@ class DivFunc:
         return args[0].type
 
 
-#----------------------
+# ----------------------
 # map operator nodes to builtin
 
 operators[ast.Add] = "add"
@@ -177,9 +176,8 @@ operators[ast.LtE] = "<="
 operators[ast.Eq] = "=="
 operators[ast.NotEq] = "!="
 
-#----------------------
+# ----------------------
 # built-in functions
-
 
 
 @builtin("min")
@@ -223,11 +221,13 @@ class StepFunc:
     def value_type(args):
         return float
 
+
 @builtin("nonzero")
 class NonZeroFunc:
     @staticmethod
     def value_type(args):
         return float
+
 
 @builtin("sign")
 class SignFunc:
@@ -277,12 +277,12 @@ class CosFunc:
     def value_type(args):
         return float
 
+
 @builtin("sqrt")
 class SqrtFunc:
     @staticmethod
     def value_type(args):
         return float
-
 
 
 @builtin("dot")
@@ -297,6 +297,7 @@ class CrossFunc:
     @staticmethod
     def value_type(args):
         return float3
+
 
 @builtin("skew")
 class SkewFunc:
@@ -358,9 +359,9 @@ class TransposeFunc:
 class LoadFunc:
     @staticmethod
     def value_type(args):
-        if (type(args[0].type) != tensor):
+        if type(args[0].type) != tensor:
             raise Exception("Load input 0 must be a tensor")
-        if (args[1].type != int):
+        if args[1].type != int:
             raise Exception("Load input 1 must be a int")
 
         return args[0].type.type
@@ -370,11 +371,11 @@ class LoadFunc:
 class StoreFunc:
     @staticmethod
     def value_type(args):
-        if (type(args[0].type) != tensor):
+        if type(args[0].type) != tensor:
             raise Exception("Store input 0 must be a tensor")
-        if (args[1].type != int):
+        if args[1].type != int:
             raise Exception("Store input 1 must be a int")
-        if (args[2].type != args[0].type.type):
+        if args[2].type != args[0].type.type:
             raise Exception("Store input 2 must be of the same type as the tensor")
 
         return None
@@ -407,6 +408,7 @@ class floatFunc:
     @staticmethod
     def value_type(args):
         return float
+
 
 @builtin("int")
 class IntFunc:
@@ -478,6 +480,7 @@ class TransformIdentity:
     def value_type(args):
         return spatial_transform
 
+
 @builtin("inverse")
 class Inverse:
     @staticmethod
@@ -498,11 +501,13 @@ class TransformGetTranslation:
     def value_type(args):
         return float3
 
+
 @builtin("spatial_transform_get_rotation")
 class TransformGetRotation:
     @staticmethod
     def value_type(args):
         return quat
+
 
 @builtin("spatial_transform_multiply")
 class TransformMulFunc:
@@ -510,11 +515,13 @@ class TransformMulFunc:
     def value_type(args):
         return spatial_transform
 
+
 # @builtin("spatial_transform_inertia")
 # class TransformInertiaFunc:
 #     @staticmethod
 #     def value_type(args):
 #         return spatial_matrix
+
 
 @builtin("spatial_adjoint")
 class SpatialAdjoint:
@@ -522,11 +529,13 @@ class SpatialAdjoint:
     def value_type(args):
         return spatial_matrix
 
+
 @builtin("spatial_dot")
 class SpatialDotFunc:
     @staticmethod
     def value_type(args):
         return float
+
 
 @builtin("spatial_cross")
 class SpatialDotFunc:
@@ -534,11 +543,13 @@ class SpatialDotFunc:
     def value_type(args):
         return spatial_vector
 
+
 @builtin("spatial_cross_dual")
 class SpatialDotFunc:
     @staticmethod
     def value_type(args):
         return spatial_vector
+
 
 @builtin("spatial_transform_point")
 class SpatialTransformPointFunc:
@@ -546,11 +557,13 @@ class SpatialTransformPointFunc:
     def value_type(args):
         return float3
 
+
 @builtin("spatial_transform_vector")
 class SpatialTransformVectorFunc:
     @staticmethod
     def value_type(args):
         return float3
+
 
 @builtin("spatial_top")
 class SpatialTopFunc:
@@ -558,23 +571,27 @@ class SpatialTopFunc:
     def value_type(args):
         return float3
 
+
 @builtin("spatial_bottom")
 class SpatialBottomFunc:
     @staticmethod
     def value_type(args):
         return float3
 
+
 @builtin("spatial_jacobian")
 class SpatialJacobian:
     @staticmethod
     def value_type(args):
         return None
-    
+
+
 @builtin("spatial_mass")
 class SpatialMass:
     @staticmethod
     def value_type(args):
         return None
+
 
 @builtin("dense_gemm")
 class DenseGemm:
@@ -582,11 +599,13 @@ class DenseGemm:
     def value_type(args):
         return None
 
+
 @builtin("dense_gemm_batched")
 class DenseGemmBatched:
     @staticmethod
     def value_type(args):
-        return None        
+        return None
+
 
 @builtin("dense_chol")
 class DenseChol:
@@ -594,11 +613,13 @@ class DenseChol:
     def value_type(args):
         return None
 
+
 @builtin("dense_chol_batched")
 class DenseCholBatched:
     @staticmethod
     def value_type(args):
-        return None        
+        return None
+
 
 @builtin("dense_subs")
 class DenseSubs:
@@ -606,19 +627,23 @@ class DenseSubs:
     def value_type(args):
         return None
 
+
 @builtin("dense_solve")
 class DenseSolve:
     @staticmethod
     def value_type(args):
         return None
 
+
 @builtin("dense_solve_batched")
 class DenseSolve:
     @staticmethod
     def value_type(args):
-        return None        
+        return None
+
 
 # helpers
+
 
 @builtin("index")
 class IndexFunc:
@@ -646,7 +671,7 @@ class Var:
         return adj.label
 
     def ctype(self):
-        if (isinstance(self.type, tensor)):
+        if isinstance(self.type, tensor):
             if self.type.type == float3:
                 return str("df::" + self.type.type.__name__) + "*"
 
@@ -657,38 +682,40 @@ class Var:
             return str(self.type.__name__)
 
 
-#--------------------
+# --------------------
 # Storage class for partial AST up to a return statement.
 
 
 class Stmt:
     def __init__(self, cond, forward, forward_replay, reverse, ret_forward, ret_line):
-        self.cond = cond               # condition, can be None
-        self.forward = forward         # all forward code outside of conditional branch *since last return*
+        self.cond = cond  # condition, can be None
+        self.forward = forward  # all forward code outside of conditional branch *since last return*
         self.forward_replay = forward_replay
-        self.reverse = reverse         # all reverse code including the reverse of any code in ret_forward
+        self.reverse = (
+            reverse  # all reverse code including the reverse of any code in ret_forward
+        )
 
-        self.ret_forward = ret_forward           # all forward commands in the return statement except the actual return statement
-        self.ret_line = ret_line                 # actual return statement
+        self.ret_forward = ret_forward  # all forward commands in the return statement except the actual return statement
+        self.ret_line = ret_line  # actual return statement
 
 
-#------------------------------------------------------------------------
+# ------------------------------------------------------------------------
 # Source code transformer, this class takes a Python function and
 # computes its adjoint using single-pass translation of the function's AST
 
 
 class Adjoint:
-    def __init__(adj, func, device='cpu'):
+    def __init__(adj, func, device="cpu"):
 
         adj.func = func
         adj.device = device
 
-        adj.symbols = {}     # map from symbols to adjoint variables
-        adj.variables = []   # list of local variables (in order)
-        adj.args = []        # list of function arguments (in order)
+        adj.symbols = {}  # map from symbols to adjoint variables
+        adj.variables = []  # list of local variables (in order)
+        adj.args = []  # list of function arguments (in order)
 
-        adj.cond = None                # condition variable if in branch
-        adj.return_var = None          # return type for function or kernel
+        adj.cond = None  # condition variable if in branch
+        adj.return_var = None  # return type for function or kernel
 
         # build AST from function object
         adj.source = inspect.getsource(func)
@@ -750,7 +777,7 @@ class Adjoint:
 
         output = adj.add_var(type=type(n), constant=n)
 
-        #adj.add_forward("var_{} = {};".format(output, n))
+        # adj.add_forward("var_{} = {};".format(output, n))
         return output
 
     def add_load(adj, input):
@@ -794,20 +821,32 @@ class Adjoint:
 
     def add_bool_op(adj, op_string, exprs):
         output = adj.add_var(bool)
-        command = "var_" + str(output) + " = " + (" " + op_string + " ").join(["var_" + str(expr) for expr in exprs]) + ";"
+        command = (
+            "var_"
+            + str(output)
+            + " = "
+            + (" " + op_string + " ").join(["var_" + str(expr) for expr in exprs])
+            + ";"
+        )
         adj.add_forward(command)
 
         return output
 
-    def add_call(adj, func, inputs, prefix='df::'):
+    def add_call(adj, func, inputs, prefix="df::"):
         # expression (zero output), e.g.: tid()
-        if (func.value_type(inputs) == None):
+        if func.value_type(inputs) == None:
 
-            forward_call = prefix + "{}({});".format(func.key, adj.format_args("var_", inputs))
+            forward_call = prefix + "{}({});".format(
+                func.key, adj.format_args("var_", inputs)
+            )
             adj.add_forward(forward_call)
 
-            if (len(inputs)):
-                reverse_call = prefix + "{}({}, {});".format("adj_" + func.key, adj.format_args("var_", inputs), adj.format_args("adj_", inputs))
+            if len(inputs):
+                reverse_call = prefix + "{}({}, {});".format(
+                    "adj_" + func.key,
+                    adj.format_args("var_", inputs),
+                    adj.format_args("adj_", inputs),
+                )
                 adj.add_reverse(reverse_call)
 
             return None
@@ -817,22 +856,34 @@ class Adjoint:
 
             output = adj.add_var(func.value_type(inputs))
 
-            forward_call = "var_{} = ".format(output) + prefix + "{}({});".format(func.key, adj.format_args("var_", inputs))
+            forward_call = (
+                "var_{} = ".format(output)
+                + prefix
+                + "{}({});".format(func.key, adj.format_args("var_", inputs))
+            )
             adj.add_forward(forward_call)
 
-            if (len(inputs)):
+            if len(inputs):
                 reverse_call = prefix + "{}({}, {}, {});".format(
-                    "adj_" + func.key, adj.format_args("var_", inputs), adj.format_args("adj_", inputs), adj.format_args("adj_", [output]))
+                    "adj_" + func.key,
+                    adj.format_args("var_", inputs),
+                    adj.format_args("adj_", inputs),
+                    adj.format_args("adj_", [output]),
+                )
                 adj.add_reverse(reverse_call)
 
             return output
 
     def add_return(adj, var):
 
-        if (var == None):
-            adj.add_forward("return;".format(var), "goto label{};".format(adj.label_count))
+        if var == None:
+            adj.add_forward(
+                "return;".format(var), "goto label{};".format(adj.label_count)
+            )
         else:
-            adj.add_forward("return var_{};".format(var), "goto label{};".format(adj.label_count))
+            adj.add_forward(
+                "return var_{};".format(var), "goto label{};".format(adj.label_count)
+            )
             adj.add_reverse("adj_" + str(var) + " += adj_ret;")
 
         adj.add_reverse("label{}:;".format(adj.label_count))
@@ -858,7 +909,12 @@ class Adjoint:
     def begin_for(adj, iter, start, end):
 
         # note that dynamic for-loops must not mutate any previous state, so we don't need to re-run them in the reverse pass
-        adj.add_forward("for (var_{0}=var_{1}; var_{0} < var_{2}; ++var_{0}) {{".format(iter, start, end), "if (false) {")
+        adj.add_forward(
+            "for (var_{0}=var_{1}; var_{0} < var_{2}; ++var_{0}) {{".format(
+                iter, start, end
+            ),
+            "if (false) {",
+        )
         adj.add_reverse("}")
 
         adj.indent_count += 1
@@ -868,7 +924,11 @@ class Adjoint:
         adj.indent_count -= 1
 
         adj.add_forward("}")
-        adj.add_reverse("for (var_{0}=var_{2}-1; var_{0} >= var_{1}; --var_{0}) {{".format(iter, start, end))
+        adj.add_reverse(
+            "for (var_{0}=var_{2}-1; var_{0} >= var_{1}; --var_{0}) {{".format(
+                iter, start, end
+            )
+        )
 
     # append a statement to the forward pass
     def add_forward(adj, statement, statement_replay=None):
@@ -880,7 +940,7 @@ class Adjoint:
         adj.body_forward.append(prefix + statement)
 
         # allow for different statement in reverse kernel replay
-        if (statement_replay):
+        if statement_replay:
             adj.body_forward_replay.append(prefix + statement_replay)
         else:
             adj.body_forward_replay.append(prefix + statement)
@@ -898,23 +958,37 @@ class Adjoint:
 
         try:
 
-            if (isinstance(node, ast.FunctionDef)):
+            if isinstance(node, ast.FunctionDef):
 
                 out = None
                 for f in node.body:
                     out = adj.eval(f)
 
-                if 'return' in adj.symbols and adj.symbols['return'] is not None:
-                    out = adj.symbols['return']
-                    stmt = Stmt(None, adj.body_forward, adj.body_forward_replay, reversed(adj.body_reverse), [], "")
+                if "return" in adj.symbols and adj.symbols["return"] is not None:
+                    out = adj.symbols["return"]
+                    stmt = Stmt(
+                        None,
+                        adj.body_forward,
+                        adj.body_forward_replay,
+                        reversed(adj.body_reverse),
+                        [],
+                        "",
+                    )
                     adj.output.append(stmt)
                 else:
-                    stmt = Stmt(None, adj.body_forward, adj.body_forward_replay, reversed(adj.body_reverse), [], "")
+                    stmt = Stmt(
+                        None,
+                        adj.body_forward,
+                        adj.body_forward_replay,
+                        reversed(adj.body_reverse),
+                        [],
+                        "",
+                    )
                     adj.output.append(stmt)
 
                 return out
 
-            elif (isinstance(node, ast.If)):         # if statement
+            elif isinstance(node, ast.If):  # if statement
 
                 if len(node.orelse) != 0:
                     raise SyntaxError("Else statements not currently supported")
@@ -951,7 +1025,7 @@ class Adjoint:
 
                 return None
 
-            elif (isinstance(node, ast.Compare)):
+            elif isinstance(node, ast.Compare):
                 # node.left, node.ops (list of ops), node.comparators (things to compare to)
                 # e.g. (left ops[0] node.comparators[0]) ops[1] node.comparators[1]
 
@@ -963,7 +1037,7 @@ class Adjoint:
 
                 return out
 
-            elif (isinstance(node, ast.BoolOp)):
+            elif isinstance(node, ast.BoolOp):
                 # op, expr list values (e.g. and and a list of things anded together)
 
                 op = node.op
@@ -981,30 +1055,30 @@ class Adjoint:
 
                 return out
 
-            elif (isinstance(node, ast.Name)):
+            elif isinstance(node, ast.Name):
                 # lookup symbol, if it has already been assigned to a variable then return the existing mapping
-                if (node.id in adj.symbols):
+                if node.id in adj.symbols:
                     return adj.symbols[node.id]
                 else:
                     raise KeyError("Referencing undefined symbol: " + str(node.id))
 
-            elif (isinstance(node, ast.Num)):
+            elif isinstance(node, ast.Num):
 
                 # lookup constant, if it has already been assigned then return existing var
-                # currently disabled, since assigning constant in a branch means it 
+                # currently disabled, since assigning constant in a branch means it
                 key = (node.n, type(node.n))
 
-                if (key in adj.symbols):
+                if key in adj.symbols:
                     return adj.symbols[key]
                 else:
                     out = adj.add_constant(node.n)
                     adj.symbols[key] = out
                     return out
 
-                #out = adj.add_constant(node.n)
-                #return out
+                # out = adj.add_constant(node.n)
+                # return out
 
-            elif (isinstance(node, ast.BinOp)):
+            elif isinstance(node, ast.BinOp):
                 # evaluate binary operator arguments
                 left = adj.eval(node.left)
                 right = adj.eval(node.right)
@@ -1015,26 +1089,28 @@ class Adjoint:
                 out = adj.add_call(func, [left, right])
                 return out
 
-            elif (isinstance(node, ast.UnaryOp)):
+            elif isinstance(node, ast.UnaryOp):
                 # evaluate unary op arguments
                 arg = adj.eval(node.operand)
 
                 out = adj.add_operator(node.op, [arg])
                 return out
 
-            elif (isinstance(node, ast.For)):
+            elif isinstance(node, ast.For):
 
-                if (len(node.iter.args) != 2):
-                    raise Exception("For loop ranges must be of form range(start, end) with both start and end specified and no skip specifier.")
+                if len(node.iter.args) != 2:
+                    raise Exception(
+                        "For loop ranges must be of form range(start, end) with both start and end specified and no skip specifier."
+                    )
 
                 # check if loop range is compile time constant
                 unroll = True
                 for a in node.iter.args:
-                    if (isinstance(a, ast.Num) == False):
+                    if isinstance(a, ast.Num) == False:
                         unroll = False
                         break
 
-                if (unroll):
+                if unroll:
 
                     # constant loop, unroll
                     start = node.iter.args[0].n
@@ -1067,24 +1143,24 @@ class Adjoint:
 
                     adj.end_for(iter, start, end)
 
-            elif (isinstance(node, ast.Expr)):
+            elif isinstance(node, ast.Expr):
                 return adj.eval(node.value)
 
-            elif (isinstance(node, ast.Call)):
+            elif isinstance(node, ast.Call):
 
                 name = None
 
                 # determine if call is to a builtin (attribute), or to a user-func (name)
-                if (isinstance(node.func, ast.Attribute)):
+                if isinstance(node.func, ast.Attribute):
                     name = node.func.attr
-                elif (isinstance(node.func, ast.Name)):
+                elif isinstance(node.func, ast.Name):
                     name = node.func.id
 
                 # check it exists
                 if name not in functions:
                     raise KeyError("Could not find function {}".format(name))
 
-                if adj.device == 'cuda' and name in cuda_functions:
+                if adj.device == "cuda" and name in cuda_functions:
                     func = cuda_functions[name]
                 else:
                     func = functions[name]
@@ -1100,7 +1176,7 @@ class Adjoint:
                 out = adj.add_call(func, args, prefix=func.prefix)
                 return out
 
-            elif (isinstance(node, ast.Subscript)):
+            elif isinstance(node, ast.Subscript):
                 target = adj.eval(node.value)
 
                 indices = []
@@ -1118,7 +1194,7 @@ class Adjoint:
                 out = adj.add_call(functions["index"], [target, *indices])
                 return out
 
-            elif (isinstance(node, ast.Assign)):
+            elif isinstance(node, ast.Assign):
                 # if adj.cond is not None:
                 #     raise SyntaxError("error, cannot assign variables in a conditional branch")
 
@@ -1129,15 +1205,18 @@ class Adjoint:
                 adj.symbols[node.targets[0].id] = out
                 return out
 
-            elif (isinstance(node, ast.Return)):
+            elif isinstance(node, ast.Return):
                 cond = adj.cond  # None if not in branch, else branch boolean
 
                 out = adj.eval(node.value)
-                adj.symbols['return'] = out
+                adj.symbols["return"] = out
 
-                if out is not None:        # set return type of function
+                if out is not None:  # set return type of function
                     return_var = out
-                    if adj.return_var is not None and adj.return_var.ctype() != return_var.ctype():
+                    if (
+                        adj.return_var is not None
+                        and adj.return_var.ctype() != return_var.ctype()
+                    ):
                         raise TypeError("error, function returned different types")
                     adj.return_var = return_var
 
@@ -1153,14 +1232,23 @@ class Adjoint:
 
             # print error / line number
             lines = adj.source.splitlines()
-            print("Error: {} while transforming node {} in func: {} at line: {} col: {}: \n    {}".format(e, type(node), adj.func.__name__, node.lineno, node.col_offset, lines[max(node.lineno-1, 0)]))
+            print(
+                "Error: {} while transforming node {} in func: {} at line: {} col: {}: \n    {}".format(
+                    e,
+                    type(node),
+                    adj.func.__name__,
+                    node.lineno,
+                    node.col_offset,
+                    lines[max(node.lineno - 1, 0)],
+                )
+            )
             raise
 
 
-#----------------
+# ----------------
 # code generation
 
-cpu_module_header = '''
+cpu_module_header = """
 #define CPU
 
 #include "adjoint.h"
@@ -1173,9 +1261,9 @@ T cast(torch::Tensor t)
     return (T)(t.data_ptr());
 }}
 
-'''
+"""
 
-cuda_module_header = '''
+cuda_module_header = """
 #define CUDA
 
 #include "adjoint.h"
@@ -1188,9 +1276,9 @@ T cast(torch::Tensor t)
     return (T)(t.data_ptr());
 }}
 
-'''
+"""
 
-cpu_function_template = '''
+cpu_function_template = """
 {return_type} {name}_cpu_func({forward_args})
 {{
     {forward_body}
@@ -1201,9 +1289,9 @@ void adj_{name}_cpu_func({forward_args}, {reverse_args})
     {reverse_body}
 }}
 
-'''
+"""
 
-cuda_function_template = '''
+cuda_function_template = """
 CUDA_CALLABLE {return_type} {name}_cuda_func({forward_args})
 {{
     {forward_body}
@@ -1214,9 +1302,9 @@ CUDA_CALLABLE void adj_{name}_cuda_func({forward_args}, {reverse_args})
     {reverse_body}
 }}
 
-'''
+"""
 
-cuda_kernel_template = '''
+cuda_kernel_template = """
 
 __global__ void {name}_cuda_kernel_forward(int dim, {forward_args})
 {{
@@ -1228,9 +1316,9 @@ __global__ void {name}_cuda_kernel_backward(int dim, {forward_args}, {reverse_ar
     {reverse_body}
 }}
 
-'''
+"""
 
-cpu_kernel_template = '''
+cpu_kernel_template = """
 
 void {name}_cpu_kernel_forward({forward_args})
 {{
@@ -1242,9 +1330,9 @@ void {name}_cpu_kernel_backward({forward_args}, {reverse_args})
     {reverse_body}
 }}
 
-'''
+"""
 
-cuda_module_template = '''
+cuda_module_template = """
 
 // Python entry points
 void {name}_cuda_forward(int dim, {forward_args})
@@ -1263,9 +1351,9 @@ void {name}_cuda_backward(int dim, {forward_args}, {reverse_args})
     //check_cuda(cudaDeviceSynchronize());
 }}
 
-'''
+"""
 
-cpu_module_template = '''
+cpu_module_template = """
 
 // Python entry points
 void {name}_cpu_forward(int dim, {forward_args})
@@ -1288,23 +1376,23 @@ void {name}_cpu_backward(int dim, {forward_args}, {reverse_args})
     }}
 }}
 
-'''
+"""
 
-cuda_module_header_template = '''
+cuda_module_header_template = """
 
 // Python entry points
 void {name}_cuda_forward(int dim, {forward_args});
 
 void {name}_cuda_backward(int dim, {forward_args}, {reverse_args});
-'''
+"""
 
-cpu_module_header_template = '''
+cpu_module_header_template = """
 
 // Python entry points
 void {name}_cpu_forward(int dim, {forward_args});
 
 void {name}_cpu_backward(int dim, {forward_args}, {reverse_args});
-'''
+"""
 
 
 def indent(args, stops=1):
@@ -1315,7 +1403,7 @@ def indent(args, stops=1):
     return sep + args.replace(", ", "," + sep)
 
 
-def codegen_func_forward_body(adj, device='cpu', indent=4):
+def codegen_func_forward_body(adj, device="cpu", indent=4):
     body = []
     indent_block = " " * indent
 
@@ -1341,29 +1429,36 @@ def codegen_func_forward_body(adj, device='cpu', indent=4):
     return "".join([indent_block + l for l in body])
 
 
-def codegen_func_forward(adj, func_type='kernel', device='cpu'):
+def codegen_func_forward(adj, func_type="kernel", device="cpu"):
     s = ""
 
     # primal vars
     s += "    //---------\n"
     s += "    // primal vars\n"
 
-    for var in adj.variables:    
+    for var in adj.variables:
         if var.constant == None:
             s += "    " + var.ctype() + " var_" + str(var.label) + ";\n"
         else:
-            s += "    const " + var.ctype() + " var_" + str(var.label) + " = " + str(var.constant) + ";\n"
-
+            s += (
+                "    const "
+                + var.ctype()
+                + " var_"
+                + str(var.label)
+                + " = "
+                + str(var.constant)
+                + ";\n"
+            )
 
     # forward pass
     s += "    //---------\n"
     s += "    // forward\n"
 
-    if device == 'cpu':
+    if device == "cpu":
         s += codegen_func_forward_body(adj, device=device, indent=4)
 
-    elif device == 'cuda':
-        if func_type == 'kernel':
+    elif device == "cuda":
+        if func_type == "kernel":
             s += "    int var_idx = blockDim.x * blockIdx.x + threadIdx.x;\n"
             s += "    if (var_idx < dim) {\n"
 
@@ -1376,7 +1471,7 @@ def codegen_func_forward(adj, func_type='kernel', device='cpu'):
     return s
 
 
-def codegen_func_reverse_body(adj, device='cpu', indent=4):
+def codegen_func_reverse_body(adj, device="cpu", indent=4):
     body = []
     indent_block = " " * indent
 
@@ -1419,7 +1514,7 @@ def codegen_func_reverse_body(adj, device='cpu', indent=4):
     return "".join([indent_block + l for l in body])
 
 
-def codegen_func_reverse(adj, func_type='kernel', device='cpu'):
+def codegen_func_reverse(adj, func_type="kernel", device="cpu"):
     s = ""
 
     # primal vars
@@ -1430,7 +1525,15 @@ def codegen_func_reverse(adj, func_type='kernel', device='cpu'):
         if var.constant == None:
             s += "    " + var.ctype() + " var_" + str(var.label) + ";\n"
         else:
-            s += "    const " + var.ctype() + " var_" + str(var.label) + " = " + str(var.constant) + ";\n"
+            s += (
+                "    const "
+                + var.ctype()
+                + " var_"
+                + str(var.label)
+                + " = "
+                + str(var.constant)
+                + ";\n"
+            )
 
     # dual vars
     s += "    //---------\n"
@@ -1439,10 +1542,10 @@ def codegen_func_reverse(adj, func_type='kernel', device='cpu'):
     for var in adj.variables:
         s += "    " + var.ctype() + " adj_" + str(var.label) + " = 0;\n"
 
-    if device == 'cpu':
+    if device == "cpu":
         s += codegen_func_reverse_body(adj, device=device, indent=4)
-    elif device == 'cuda':
-        if func_type == 'kernel':
+    elif device == "cuda":
+        if func_type == "kernel":
             s += "    int var_idx = blockDim.x * blockIdx.x + threadIdx.x;\n"
             s += "    if (var_idx < dim) {\n"
             s += codegen_func_reverse_body(adj, device=device, indent=8)
@@ -1455,12 +1558,12 @@ def codegen_func_reverse(adj, func_type='kernel', device='cpu'):
     return s
 
 
-def codegen_func(adj, device='cpu'):
+def codegen_func(adj, device="cpu"):
 
     # forward header
     # return_type = "void"
 
-    return_type = 'void' if adj.return_var is None else adj.return_var.ctype()
+    return_type = "void" if adj.return_var is None else adj.return_var.ctype()
 
     # s = "{} {}_forward(".format(return_type, adj.func.__name__)
 
@@ -1516,27 +1619,29 @@ def codegen_func(adj, device='cpu'):
     #     s += sep + str(adj.symbols['return'].type.__name__) + " adj_" + str(adj.symbols['return'])
 
     # codegen body
-    forward_body = codegen_func_forward(adj, func_type='function', device=device)
-    reverse_body = codegen_func_reverse(adj, func_type='function', device=device)
+    forward_body = codegen_func_forward(adj, func_type="function", device=device)
+    reverse_body = codegen_func_reverse(adj, func_type="function", device=device)
 
-    if device == 'cpu':
+    if device == "cpu":
         template = cpu_function_template
-    elif device == 'cuda':
+    elif device == "cuda":
         template = cuda_function_template
     else:
         raise ValueError("Device {} is not supported".format(device))
 
-    s = template.format(name=adj.func.__name__,
-                        return_type=return_type,
-                        forward_args=indent(forward_args),
-                        reverse_args=indent(reverse_args),
-                        forward_body=forward_body,
-                        reverse_body=reverse_body)
+    s = template.format(
+        name=adj.func.__name__,
+        return_type=return_type,
+        forward_args=indent(forward_args),
+        reverse_args=indent(reverse_args),
+        forward_body=forward_body,
+        reverse_body=reverse_body,
+    )
 
     return s
 
 
-def codegen_kernel(adj, device='cpu'):
+def codegen_kernel(adj, device="cpu"):
 
     forward_args = ""
     reverse_args = ""
@@ -1554,29 +1659,31 @@ def codegen_kernel(adj, device='cpu'):
         sep = ", "
 
     # codegen body
-    forward_body = codegen_func_forward(adj, func_type='kernel', device=device)
-    reverse_body = codegen_func_reverse(adj, func_type='kernel', device=device)
+    forward_body = codegen_func_forward(adj, func_type="kernel", device=device)
+    reverse_body = codegen_func_reverse(adj, func_type="kernel", device=device)
 
     # import pdb
     # pdb.set_trace()
 
-    if device == 'cpu':
+    if device == "cpu":
         template = cpu_kernel_template
-    elif device == 'cuda':
+    elif device == "cuda":
         template = cuda_kernel_template
     else:
         raise ValueError("Device {} is not supported".format(device))
 
-    s = template.format(name=adj.func.__name__,
-                        forward_args=indent(forward_args),
-                        reverse_args=indent(reverse_args),
-                        forward_body=forward_body,
-                        reverse_body=reverse_body)
+    s = template.format(
+        name=adj.func.__name__,
+        forward_args=indent(forward_args),
+        reverse_args=indent(reverse_args),
+        forward_body=forward_body,
+        reverse_body=reverse_body,
+    )
 
     return s
 
 
-def codegen_module(adj, device='cpu'):
+def codegen_module(adj, device="cpu"):
 
     forward_args = ""
     reverse_args = ""
@@ -1586,7 +1693,7 @@ def codegen_module(adj, device='cpu'):
 
     sep = ""
     for arg in adj.args:
-        if (isinstance(arg.type, tensor)):
+        if isinstance(arg.type, tensor):
             forward_args += sep + "torch::Tensor var_" + arg.label
             forward_params += sep + "cast<" + arg.ctype() + ">(var_" + arg.label + ")"
         else:
@@ -1597,7 +1704,7 @@ def codegen_module(adj, device='cpu'):
 
     sep = ""
     for arg in adj.args:
-        if (isinstance(arg.type, tensor)):
+        if isinstance(arg.type, tensor):
             reverse_args += sep + "torch::Tensor adj_" + arg.label
             reverse_params += sep + "cast<" + arg.ctype() + ">(adj_" + arg.label + ")"
         else:
@@ -1606,22 +1713,24 @@ def codegen_module(adj, device='cpu'):
 
         sep = ", "
 
-    if device == 'cpu':
+    if device == "cpu":
         template = cpu_module_template
-    elif device == 'cuda':
+    elif device == "cuda":
         template = cuda_module_template
     else:
         raise ValueError("Device {} is not supported".format(device))
 
-    s = template.format(name=adj.func.__name__,
-                        forward_args=indent(forward_args),
-                        reverse_args=indent(reverse_args),
-                        forward_params=indent(forward_params, 3),
-                        reverse_params=indent(reverse_params, 3))
+    s = template.format(
+        name=adj.func.__name__,
+        forward_args=indent(forward_args),
+        reverse_args=indent(reverse_args),
+        forward_params=indent(forward_params, 3),
+        reverse_params=indent(reverse_params, 3),
+    )
     return s
 
 
-def codegen_module_decl(adj, device='cpu'):
+def codegen_module_decl(adj, device="cpu"):
 
     forward_args = ""
     reverse_args = ""
@@ -1631,7 +1740,7 @@ def codegen_module_decl(adj, device='cpu'):
 
     sep = ""
     for arg in adj.args:
-        if (isinstance(arg.type, tensor)):
+        if isinstance(arg.type, tensor):
             forward_args += sep + "torch::Tensor var_" + arg.label
             forward_params += sep + "cast<" + arg.ctype() + ">(var_" + arg.label + ")"
         else:
@@ -1642,7 +1751,7 @@ def codegen_module_decl(adj, device='cpu'):
 
     sep = ""
     for arg in adj.args:
-        if (isinstance(arg.type, tensor)):
+        if isinstance(arg.type, tensor):
             reverse_args += sep + "torch::Tensor adj_" + arg.label
             reverse_params += sep + "cast<" + arg.ctype() + ">(adj_" + arg.label + ")"
         else:
@@ -1651,20 +1760,24 @@ def codegen_module_decl(adj, device='cpu'):
 
         sep = ", "
 
-    if device == 'cpu':
+    if device == "cpu":
         template = cpu_module_header_template
-    elif device == 'cuda':
+    elif device == "cuda":
         template = cuda_module_header_template
     else:
         raise ValueError("Device {} is not supported".format(device))
 
-    s = template.format(name=adj.func.__name__, forward_args=indent(forward_args), reverse_args=indent(reverse_args))
+    s = template.format(
+        name=adj.func.__name__,
+        forward_args=indent(forward_args),
+        reverse_args=indent(reverse_args),
+    )
     return s
 
 
 # runs vcvars and copies back the build environment, PyTorch should really be doing this
 def set_build_env():
-    if os.name == 'nt':
+    if os.name == "nt":
         # VS2019 (required for PyTorch headers)
         vcvars_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\Build\\vcvars64.bat"
 
@@ -1672,9 +1785,9 @@ def set_build_env():
         output = os.popen(s).read()
         for line in output.splitlines():
             pair = line.split("=", 1)
-            if (len(pair) >= 2):
+            if len(pair) >= 2:
                 os.environ[pair[0]] = pair[1]
-    else:          # nothing needed for Linux or Mac
+    else:  # nothing needed for Linux or Mac
         pass
 
 
@@ -1734,9 +1847,13 @@ def kernel(f):
             self.forward_cpu = eval("module." + self.func.__name__ + "_cpu_forward")
             self.backward_cpu = eval("module." + self.func.__name__ + "_cpu_backward")
 
-            if (torch.cuda.is_available()):
-                self.forward_cuda = eval("module." + self.func.__name__ + "_cuda_forward")
-                self.backward_cuda = eval("module." + self.func.__name__ + "_cuda_backward")
+            if torch.cuda.is_available():
+                self.forward_cuda = eval(
+                    "module." + self.func.__name__ + "_cuda_forward"
+                )
+                self.backward_cuda = eval(
+                    "module." + self.func.__name__ + "_cuda_backward"
+                )
 
     k = Kernel(f)
 
@@ -1762,11 +1879,11 @@ def compile():
 
     # functions
     for name, func in user_funcs.items():
-        adj = Adjoint(func, device='cpu')
-        cpp_source += codegen_func(adj, device='cpu')
+        adj = Adjoint(func, device="cpu")
+        cpp_source += codegen_func(adj, device="cpu")
 
-        adj = Adjoint(func, device='cuda')
-        cuda_source += codegen_func(adj, device='cuda')
+        adj = Adjoint(func, device="cuda")
+        cuda_source += codegen_func(adj, device="cuda")
 
         # import pdb
         # pdb.set_trace()
@@ -1800,32 +1917,32 @@ def compile():
         entry_points.append(name + "_cpu_backward")
 
         if use_cuda:
-            adj = Adjoint(kernel.func, device='cuda')
-            cuda_source += codegen_kernel(adj, device='cuda')
-            cuda_source += codegen_module(adj, device='cuda')
-            cpp_source += codegen_module_decl(adj, device='cuda')
+            adj = Adjoint(kernel.func, device="cuda")
+            cuda_source += codegen_kernel(adj, device="cuda")
+            cuda_source += codegen_module(adj, device="cuda")
+            cpp_source += codegen_module_decl(adj, device="cuda")
 
-        adj = Adjoint(kernel.func, device='cpu')
-        cpp_source += codegen_kernel(adj, device='cpu')
-        cpp_source += codegen_module(adj, device='cpu')
-        cpp_source += codegen_module_decl(adj, device='cpu')
+        adj = Adjoint(kernel.func, device="cpu")
+        cpp_source += codegen_kernel(adj, device="cpu")
+        cpp_source += codegen_module(adj, device="cpu")
+        cpp_source += codegen_module_decl(adj, device="cpu")
 
     include_path = os.path.dirname(os.path.realpath(__file__))
     build_path = os.path.dirname(os.path.realpath(__file__)) + "/kernels"
     cache_file = build_path + "/adjoint.gen"
 
-    if (os.path.exists(build_path) == False):
+    if os.path.exists(build_path) == False:
         os.mkdir(build_path)
 
     # test cache
-    if (os.path.exists(cache_file)):
+    if os.path.exists(cache_file):
 
-        f = open(cache_file, 'r')
+        f = open(cache_file, "r")
 
         cache_string = f.read()
         f.close()
 
-        if (cache_string == cpp_source):
+        if cache_string == cpp_source:
             print("Using cached kernels")
             module = import_module("kernels", build_path)
 
@@ -1845,14 +1962,14 @@ def compile():
     set_build_env()
 
     # debug config
-    #module = torch.utils.cpp_extension.load_inline('kernels', [cpp_source], None, entry_points, extra_cflags=["/Zi", "/Od"], extra_ldflags=["/DEBUG"], build_directory=build_path, extra_include_paths=[include_path], verbose=True)
+    # module = torch.utils.cpp_extension.load_inline('kernels', [cpp_source], None, entry_points, extra_cflags=["/Zi", "/Od"], extra_ldflags=["/DEBUG"], build_directory=build_path, extra_include_paths=[include_path], verbose=True)
 
-    if os.name == 'nt':
+    if os.name == "nt":
         cpp_flags = ["/Ox", "-DNDEBUG", "/fp:fast"]
         ld_flags = ["-DNDEBUG"]
 
-#        cpp_flags = ["/Zi", "/Od", "/DEBUG"]
-#        ld_flags = ["/DEBUG"]
+    #        cpp_flags = ["/Zi", "/Od", "/DEBUG"]
+    #        ld_flags = ["/DEBUG"]
     else:
         cpp_flags = ["-Z", "-O2", "-DNDEBUG"]
         ld_flags = ["-DNDEBUG"]
@@ -1864,40 +1981,45 @@ def compile():
     # cuda13_flag = "-gencode=arch=compute_120,code=compute_120 "
 
     # just use minimum to ensure compatability
-    cuda_flags = [
-        cuda12_flag +
-        "-I/usr/local/cuda/include " +
-        "-L/usr/local/cuda/lib64 "
-    ]
+    cuda_flags = ["-gencode=arch=compute_35,code=compute_35"]
+    # cuda_flags = [
+    #     cuda12_flag +
+    #     "-I/usr/local/cuda/include " +
+    #     "-L/usr/local/cuda/lib64 "
+    # ]
 
     # release config
     if use_cuda:
-        module = torch.utils.cpp_extension.load_inline('kernels',
-                                                       cpp_sources=[cpp_source],
-                                                       cuda_sources=[cuda_source],
-                                                       functions=entry_points,
-                                                       extra_cflags=cpp_flags,
-                                                       extra_ldflags=ld_flags,
-                                                       extra_cuda_cflags=cuda_flags,
-                                                       build_directory=build_path,
-                                                       extra_include_paths=[include_path],
-                                                       verbose=True,
-                                                       with_pytorch_error_handling=False)
+        module = torch.utils.cpp_extension.load_inline(
+            "kernels",
+            cpp_sources=[cpp_source],
+            cuda_sources=[cuda_source],
+            functions=entry_points,
+            extra_cflags=cpp_flags,
+            extra_ldflags=ld_flags,
+            extra_cuda_cflags=cuda_flags,
+            build_directory=build_path,
+            extra_include_paths=[include_path],
+            verbose=True,
+            with_pytorch_error_handling=False,
+        )
     else:
-        module = torch.utils.cpp_extension.load_inline('kernels',
-                                                       cpp_sources=[cpp_source],
-                                                       cuda_sources=[],
-                                                       functions=entry_points,
-                                                       extra_cflags=cpp_flags,
-                                                       extra_ldflags=ld_flags,
-                                                       extra_cuda_cflags=cuda_flags,
-                                                       build_directory=build_path,
-                                                       extra_include_paths=[include_path],
-                                                       verbose=True,
-                                                       with_pytorch_error_handling=False)
+        module = torch.utils.cpp_extension.load_inline(
+            "kernels",
+            cpp_sources=[cpp_source],
+            cuda_sources=[],
+            functions=entry_points,
+            extra_cflags=cpp_flags,
+            extra_ldflags=ld_flags,
+            extra_cuda_cflags=cuda_flags,
+            build_directory=build_path,
+            extra_include_paths=[include_path],
+            verbose=True,
+            with_pytorch_error_handling=False,
+        )
 
     # update cache
-    f = open(cache_file, 'w')
+    f = open(cache_file, "w")
     f.write(cpp_source)
     f.close()
 
@@ -1908,36 +2030,32 @@ def compile():
     return module
 
 
-
-
-
-
-
-
-#---------------------------------------------
+# ---------------------------------------------
 # Helper functions for launching kernels as Torch ops
+
 
 def check_adapter(l, a):
 
     for t in l:
         if torch.is_tensor(t):
-            assert(t.device.type == a)
+            assert t.device.type == a
+
 
 def check_finite(l):
     for t in l:
         if torch.is_tensor(t):
-            assert(t.is_contiguous())
+            assert t.is_contiguous()
 
-            if (torch.isnan(t).any() == True):
+            if torch.isnan(t).any() == True:
                 print(t)
-            assert(torch.isnan(t).any() == False)
+            assert torch.isnan(t).any() == False
         else:
-            assert(math.isnan(t) == False)
+            assert math.isnan(t) == False
 
 
 def filter_grads(grads):
     """helper that takes a list of gradient tensors and makes non-outputs None
-       as required by PyTorch when returning from a custom op
+    as required by PyTorch when returning from a custom op
     """
     outputs = []
 
@@ -1968,7 +2086,7 @@ def make_contiguous(grads):
 
     return ret
 
-    
+
 def copy_params(params):
     out = []
     for p in params:
@@ -1993,16 +2111,31 @@ def assert_device(device, inputs):
     for arg in inputs:
         if isinstance(arg, torch.Tensor):
             if (arg.dtype == torch.float64) or (arg.dtype == torch.float16):
-                raise TypeError("Tensor {arg} has invalid dtype {dtype}".format(arg=arg, dtype=arg.dtype))
+                raise TypeError(
+                    "Tensor {arg} has invalid dtype {dtype}".format(
+                        arg=arg, dtype=arg.dtype
+                    )
+                )
 
-            if device == 'cpu':
-                if arg.is_cuda:        # make sure all tensors are on the right device. Can fail silently in the CUDA kernel.
-                    raise TypeError("Tensor {arg} is using CUDA but was expected to be on the CPU.".format(arg=arg))
-            elif torch.device(device).type == 'cuda': #elif device.startswith('cuda'):
+            if device == "cpu":
+                if (
+                    arg.is_cuda
+                ):  # make sure all tensors are on the right device. Can fail silently in the CUDA kernel.
+                    raise TypeError(
+                        "Tensor {arg} is using CUDA but was expected to be on the CPU.".format(
+                            arg=arg
+                        )
+                    )
+            elif torch.device(device).type == "cuda":  # elif device.startswith('cuda'):
                 if not arg.is_cuda:
-                    raise TypeError("Tensor {arg} is not on a CUDA device but was expected to be using CUDA.".format(arg=arg))
+                    raise TypeError(
+                        "Tensor {arg} is not on a CUDA device but was expected to be using CUDA.".format(
+                            arg=arg
+                        )
+                    )
             else:
                 raise ValueError("Device {} is not supported".format(device))
+
 
 def to_weak_list(s):
     w = []
@@ -2011,30 +2144,40 @@ def to_weak_list(s):
 
     return w
 
+
 def to_strong_list(w):
     s = []
     for o in w:
         s.append(o())
-    
+
     return s
 
 
 # standalone method to launch a kernel using PyTorch graph (skip custom tape)
-def launch_torch(func, dim, inputs, outputs, adapter, preserve_output=False, check_grad=False, no_grad=False):
+def launch_torch(
+    func,
+    dim,
+    inputs,
+    outputs,
+    adapter,
+    preserve_output=False,
+    check_grad=False,
+    no_grad=False,
+):
 
     num_inputs = len(inputs)
     num_outputs = len(outputs)
-        
+
     # define autograd type
     class TorchFunc(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *args):
 
-            #local_inputs = args[0:num_inputs]
-            #local_outputs = args[num_inputs:len(args)]
+            # local_inputs = args[0:num_inputs]
+            # local_outputs = args[num_inputs:len(args)]
 
             # save for backward
-            #ctx.inputs = list(local_inputs)
+            # ctx.inputs = list(local_inputs)
             ctx.inputs = args
 
             local_outputs = []
@@ -2047,9 +2190,11 @@ def launch_torch(func, dim, inputs, outputs, adapter, preserve_output=False, che
             assert_device(adapter, args)
 
             # launch
-            if adapter == 'cpu':
+            if adapter == "cpu":
                 func.forward_cpu(*[dim, *args, *ctx.outputs])
-            elif torch.device(adapter).type == 'cuda': #elif adapter.startswith('cuda'):
+            elif (
+                torch.device(adapter).type == "cuda"
+            ):  # elif adapter.startswith('cuda'):
                 func.forward_cuda(*[dim, *args, *ctx.outputs])
 
             ret = tuple(ctx.outputs)
@@ -2079,7 +2224,7 @@ def launch_torch(func, dim, inputs, outputs, adapter, preserve_output=False, che
             # print ("   inputs")
             # for i in ctx.inputs:
             #     print(i)
-            
+
             # print ("   outputs")
             # for o in ctx.outputs:
             #     print(o)
@@ -2093,10 +2238,16 @@ def launch_torch(func, dim, inputs, outputs, adapter, preserve_output=False, che
             #     print(adj_o)
 
             # launch
-            if adapter == 'cpu':
-                func.backward_cpu(*[dim, *ctx.inputs, *local_outputs, *adj_inputs, *adj_outputs])
-            elif torch.device(adapter).type == 'cuda': #elif adapter.startswith('cuda'):
-                func.backward_cuda(*[dim, *ctx.inputs, *local_outputs, *adj_inputs, *adj_outputs])
+            if adapter == "cpu":
+                func.backward_cpu(
+                    *[dim, *ctx.inputs, *local_outputs, *adj_inputs, *adj_outputs]
+                )
+            elif (
+                torch.device(adapter).type == "cuda"
+            ):  # elif adapter.startswith('cuda'):
+                func.backward_cuda(
+                    *[dim, *ctx.inputs, *local_outputs, *adj_inputs, *adj_outputs]
+                )
 
             # filter grads replaces empty tensors / constant params with None
             ret = list(filter_grads(adj_inputs))
@@ -2111,9 +2262,16 @@ def launch_torch(func, dim, inputs, outputs, adapter, preserve_output=False, che
 
     torch.set_printoptions(edgeitems=3)
 
-    if (check_grad == True and no_grad == False):
+    if check_grad == True and no_grad == False:
         try:
-            torch.autograd.gradcheck(TorchFunc.apply, params, eps=1e-2, atol=1e-3, rtol=1.e-3, raise_exception=True)
+            torch.autograd.gradcheck(
+                TorchFunc.apply,
+                params,
+                eps=1e-2,
+                atol=1e-3,
+                rtol=1.0e-3,
+                raise_exception=True,
+            )
         except Exception as e:
             print(str(func.func.__name__) + " failed: " + str(e))
 
@@ -2129,15 +2287,23 @@ class Tape:
         # dictionary mapping Tensor inputs to their adjoint
         self.adjoints = {}
 
+    def launch(
+        self,
+        func,
+        dim,
+        inputs,
+        outputs,
+        adapter,
+        preserve_output=False,
+        skip_check_grad=False,
+    ):
 
-    def launch(self, func, dim, inputs, outputs, adapter, preserve_output=False, skip_check_grad=False):
-
-        if (dim > 0):
+        if dim > 0:
 
             # run kernel
-            if adapter == 'cpu':
+            if adapter == "cpu":
                 func.forward_cpu(*[dim, *inputs, *outputs])
-            elif torch.device(adapter).type == 'cuda': #adapter.startswith('cuda'):
+            elif torch.device(adapter).type == "cuda":  # adapter.startswith('cuda'):
                 func.forward_cuda(*[dim, *inputs, *outputs])
 
             if dflex.config.verify_fp:
@@ -2148,17 +2314,26 @@ class Tape:
 
             # record launch
             if dflex.config.no_grad == False:
-                self.launches.append([func, dim, inputs, outputs, adapter, preserve_output])
+                self.launches.append(
+                    [func, dim, inputs, outputs, adapter, preserve_output]
+                )
 
             # optionally run grad check
             if dflex.config.check_grad == True and skip_check_grad == False:
-                
+
                 # copy inputs and outputs to avoid disturbing the computational graph
                 inputs_copy = copy_params(inputs)
                 outputs_copy = copy_params(outputs)
 
-                launch_torch(func, dim, inputs_copy, outputs_copy, adapter, preserve_output, check_grad=True)
-                    
+                launch_torch(
+                    func,
+                    dim,
+                    inputs_copy,
+                    outputs_copy,
+                    adapter,
+                    preserve_output,
+                    check_grad=True,
+                )
 
     def replay(self):
 
@@ -2167,7 +2342,7 @@ class Tape:
             func = kernel[0]
             dim = kernel[1]
             inputs = kernel[2]
-            #outputs = to_strong_list(kernel[3])
+            # outputs = to_strong_list(kernel[3])
             outputs = kernel[3]
             adapter = kernel[4]
 
@@ -2177,7 +2352,7 @@ class Tape:
 
             # build input adjoints
             for i in inputs:
-                                      
+
                 if i in self.adjoints:
                     adj_inputs.append(self.adjoints[i])
                 else:
@@ -2195,12 +2370,13 @@ class Tape:
                     # allocate a zero tensor (they will still be read by the kernels)
                     adj_outputs.append(self.alloc_grad(o))
 
-             # launch reverse
-            if adapter == 'cpu':
+            # launch reverse
+            if adapter == "cpu":
                 func.backward_cpu(*[dim, *inputs, *outputs, *adj_inputs, *adj_outputs])
-            elif torch.device(adapter).type == 'cuda': #elif adapter.startswith('cuda'):
+            elif (
+                torch.device(adapter).type == "cuda"
+            ):  # elif adapter.startswith('cuda'):
                 func.backward_cuda(*[dim, *inputs, *outputs, *adj_inputs, *adj_outputs])
-
 
             if dflex.config.verify_fp:
                 check_finite(inputs)
@@ -2208,12 +2384,10 @@ class Tape:
                 check_finite(adj_inputs)
                 check_finite(adj_outputs)
 
-
     def reset(self):
 
         self.adjoints = {}
         self.launches = []
-        
 
     def alloc_grad(self, t):
 
@@ -2240,10 +2414,10 @@ def alloc_grads(inputs, adapter):
     grads = []
 
     for arg in inputs:
-        if (torch.is_tensor(arg)):
-            if (arg.requires_grad and arg.dtype == torch.float):
+        if torch.is_tensor(arg):
+            if arg.requires_grad and arg.dtype == torch.float:
                 grads.append(torch.zeros_like(arg, device=adapter))
-                #grads.append(lookup_grad(arg))
+                # grads.append(lookup_grad(arg))
             else:
                 grads.append(torch.FloatTensor().to(adapter))
         else:
@@ -2252,13 +2426,12 @@ def alloc_grads(inputs, adapter):
     return grads
 
 
-
 def matmul(tape, m, n, k, t1, t2, A, B, C, adapter):
-    
-    if (adapter == 'cpu'):
+
+    if adapter == "cpu":
         threads = 1
     else:
-        threads = 256   # should match the threadblock size
+        threads = 256  # should match the threadblock size
 
     tape.launch(
         func=dflex.eval_dense_gemm,
@@ -2272,19 +2445,22 @@ def matmul(tape, m, n, k, t1, t2, A, B, C, adapter):
             A,
             B,
         ],
-        outputs=[
-            C
-        ],
+        outputs=[C],
         adapter=adapter,
-        preserve_output=False)
+        preserve_output=False,
+    )
 
 
-def matmul_batched(tape, batch_count, m, n, k, t1, t2, A_start, B_start, C_start, A, B, C, adapter):
-    
-    if (adapter == 'cpu'):
+def matmul_batched(
+    tape, batch_count, m, n, k, t1, t2, A_start, B_start, C_start, A, B, C, adapter
+):
+
+    if adapter == "cpu":
         threads = batch_count
     else:
-        threads = 256*batch_count   # must match the threadblock size used in adjoint.py
+        threads = (
+            256 * batch_count
+        )  # must match the threadblock size used in adjoint.py
 
     tape.launch(
         func=dflex.eval_dense_gemm_batched,
@@ -2301,8 +2477,7 @@ def matmul_batched(tape, batch_count, m, n, k, t1, t2, A_start, B_start, C_start
             A,
             B,
         ],
-        outputs=[
-            C
-        ],
+        outputs=[C],
         adapter=adapter,
-        preserve_output=False)
+        preserve_output=False,
+    )
