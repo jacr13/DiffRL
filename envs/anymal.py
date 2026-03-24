@@ -44,6 +44,7 @@ class AnymalEnv(DFlexEnv):
         num_envs=64,
         episode_length=1000,
         no_grad=True,
+        seed=0,
         stochastic_init=False,
         MM_caching_frequency=16,
         early_termination=True,
@@ -56,6 +57,7 @@ class AnymalEnv(DFlexEnv):
         up_rew_scale=0.1,
         heading_rew_scale=1.0,
         heigh_rew_scale=1.0,
+        no_env_offset=False,
     ):
         num_obs = 49
         num_act = 12
@@ -66,13 +68,15 @@ class AnymalEnv(DFlexEnv):
             num_act,
             episode_length,
             MM_caching_frequency,
+            seed,
             no_grad,
             render,
-            nan_state_fix,
-            jacobian_norm,
-            stochastic_init,
-            jacobian,
+            # nan_state_fix,
+            # jacobian_norm,
+            # stochastic_init,
+            # jacobian,
             device,
+            no_env_offset,
         )
 
         self.early_termination = early_termination
@@ -89,7 +93,20 @@ class AnymalEnv(DFlexEnv):
         self.heading_rew_scale = heading_rew_scale
         self.heigh_rew_scale = heigh_rew_scale
 
-        self.setup_visualizer(logdir)
+        # self.setup_visualizer(logdir)
+        # -----------------------
+        # set up Usd renderer
+        if self.visualize:
+            self.stage = Usd.Stage.CreateNew(
+                "outputs/" + "Anymal_" + str(self.num_envs) + ".usd"
+            )
+
+            self.renderer = df.render.UsdRenderer(self.model, self.stage)
+            self.renderer.draw_points = True
+            self.renderer.draw_springs = True
+            self.renderer.draw_shapes = True
+            self.render_time = 0.0
+            self.renderer.save = lambda: self.stage.Save()
 
     def init_sim(self):
         self.builder = df.sim.ModelBuilder()
@@ -151,7 +168,7 @@ class AnymalEnv(DFlexEnv):
         # Taken from IsaacGym
         # https://github.com/NVIDIA-Omniverse/IsaacGymEnvs/blob/main/isaacgymenvs/cfg/task/Anymal.yaml
 
-        if self.visualize:
+        if self.no_env_offset:
             self.env_dist = 2.5
         else:
             self.env_dist = 0.0  # set to zero for training for numerical consistency
