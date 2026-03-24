@@ -5,10 +5,11 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-from .dflex_env import DFlexEnv
 from .ant import AntEnv
-from .cheetah import CheetahEnv
-from .hopper import HopperEnv
-from .snu_humanoid import SNUHumanoidEnv
+from .anymal import AnymalEnv
 from .cartpole_swing_up import CartPoleSwingUpEnv
+from .cheetah import CheetahEnv
+from .dflex_env import DFlexEnv
+from .hopper import HopperEnv
 from .humanoid import HumanoidEnv
+from .snu_humanoid import SNUHumanoidEnv
