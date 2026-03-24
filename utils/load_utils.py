@@ -147,6 +147,8 @@ def urdf_load(
     filename,
     xform,
     floating=False,
+    stiffness=100.0,
+    damping=10.0,
     armature=0.0,
     shape_ke=1.0e4,
     shape_kd=1.0e4,
@@ -167,7 +169,9 @@ def urdf_load(
 
     # add base
     if floating:
-        root = builder.add_link(-1, df.transform_identity(), (0, 0, 0), df.JOINT_FREE)
+        root = builder.add_link(
+            -1, df.transform_identity(), (0, 0, 0), df.JOINT_FREE, armature=armature
+        )
 
         # set dofs to transform
         start = builder.joint_q_start[root]
@@ -217,7 +221,6 @@ def urdf_load(
 
         lower = -1.0e3
         upper = 1.0e3
-        damping = 0.0
 
         # limits
         if joint.limit:
@@ -242,6 +245,8 @@ def urdf_load(
             limit_ke=limit_ke,
             limit_kd=limit_kd,
             damping=damping,
+            armature=armature,
+            stiffness=stiffness,
         )
 
         # add collisions
