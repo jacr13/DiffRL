@@ -482,3 +482,112 @@ class AnymalEnv(DFlexEnv):
         self.clear_grad()
         self.obs_buf = self.observation_from_state(self.state)
         return self.obs_buf
+
+    def step(self, actions, play=False):
+        actions = actions.view((self.num_envs, self.num_actions))
+        actions = torch.clip(actions, -1.0, 1.0)
+        unscaled_actions = self.unscale_act(actions)
+        self.set_act(unscaled_actions)
+
+        ##### an ugly fix for simulation nan values #### # reference: https://github.com/pytorch/pytorch/issues/15131
+        if self.nan_state_fix:
+
+            def create_hook():
+                def hook(grad):
+                    torch.nan_to_num(grad, 0.0, 0.0, 0.0, out=grad)
+
+                return hook
+
+            if self.state.joint_q.requires_grad:
+                self.state.joint_q.register_hook(create_hook())
+            if self.state.joint_qd.requires_grad:
+                self.state.joint_qd.register_hook(create_hook())
+            if actions.requires_grad:
+                actions.register_hook(create_hook())
+
+        # if self.jacobian_norm:
+
+        #     def create_hook():
+        #         def hook(grad):
+        #             mask = torch.norm(grad, dim=1) > self.jacobian_norm
+        #             if torch.any(mask):
+        #                 grad[mask] /= (torch.norm(grad, dim=1)[mask] + 1e-9).view(
+        #                     (-1, 1)
+        #                 ) * self.jacobian_norm
+        #             return grad
+
+        #         return hook
+
+        #     if self.obs_buf.requires_grad:
+        #         self.obs_buf.register_hook(create_hook())
+        #     if actions.requires_grad:
+        #         actions.register_hook(create_hook())
+
+        next_state = self.integrator.forward(
+            self.model,
+            self.state,
+            self.sim_dt,
+            self.sim_substeps,
+            self.MM_caching_frequency,
+        )
+
+        # # compute dynamics jacobians if requested
+        # if self.jacobian and not play:
+        #     inputs = torch.cat((self.obs_buf.clone(), unscaled_actions.clone()), dim=1)
+        #     inputs.requires_grad_(True)
+        #     last_obs = inputs[:, : self.num_obs]
+        #     act = inputs[:, self.num_obs :]
+        #     self.set_state_act(last_obs, act)
+        #     output = self.integrator.forward(
+        #         self.model,
+        #         self.state,
+        #         self.sim_dt,
+        #         self.sim_substeps,
+        #         self.MM_caching_frequency,
+        #         False,
+        #     )
+        #     outputs = self.observation_from_state(output)
+        #     # TODO for some reason can only compute up to 11th dim
+        #     jac = jacobian(outputs, inputs, max_out_dim=11)
+        #     self.jacobians.append(jac.cpu().numpy())
+
+        self.state = next_state
+        self.sim_time += self.sim_dt
+
+        self.progress_buf += 1
+        self.num_frames += 1
+
+        rew = self.calculate_reward(self.obs_buf, actions)
+        self.obs_buf = self.observation_from_state(self.state)
+
+        # Reset environments if agent has ended in a bad state based on heuristics
+        termination = self.compute_termination(self.obs_buf, actions)
+
+        # Reset environments if exseeded horizon
+        truncation = self.progress_buf > self.episode_length - 1
+
+        extras = self._get_extras(termination, truncation, play=play)
+
+        # reset all environments which have been terminated
+        done = termination | truncation
+        env_ids = done.nonzero(as_tuple=False).squeeze(-1)
+        if len(env_ids) > 0:
+            self.reset(env_ids)
+
+        self.render()
+
+        return self.obs_buf, rew, done, extras
+
+    def render(self, mode="human"):
+        if self.visualize:
+            self.render_time += self.dt
+            self.renderer.update(self.state, self.render_time)
+
+            render_interval = 1
+            if self.num_frames == render_interval:
+                try:
+                    self.stage.Save()
+                except:
+                    print("USD save error")
+
+                self.num_frames -= render_interval
