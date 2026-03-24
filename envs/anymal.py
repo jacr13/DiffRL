@@ -473,3 +473,12 @@ class AnymalEnv(DFlexEnv):
         )
 
         return extras
+
+    def initialize_trajectory(self):
+        """
+        This function starts collecting a new trajectory from the current states but cuts off the computation graph to the previous states.
+        It has to be called every time the algorithm starts an episode and it returns the observation vectors
+        """
+        self.clear_grad()
+        self.obs_buf = self.observation_from_state(self.state)
+        return self.obs_buf
