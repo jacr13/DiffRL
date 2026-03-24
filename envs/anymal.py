@@ -79,6 +79,7 @@ class AnymalEnv(DFlexEnv):
             no_env_offset,
         )
 
+        self.nan_state_fix = nan_state_fix
         self.stochastic_init = stochastic_init
         self.early_termination = early_termination
         self.init_sim()
