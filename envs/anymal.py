@@ -459,10 +459,10 @@ class AnymalEnv(DFlexEnv):
                 "joint_qd": self.state.joint_qd.view(self.num_envs, -1)
                 .clone()
                 .detach(),
-                "contact_count": self.state.contact_count.clone().detach(),
-                "contact_forces": self.state.contact_f.clone()
-                .detach()
-                .view(self.num_envs, -1, 6),
+                # "contact_count": self.state.contact_count.clone().detach(),
+                # "contact_forces": self.state.contact_f.clone()
+                # .detach()
+                # .view(self.num_envs, -1, 6),
                 "body_forces": self.state.body_f_s.clone()
                 .detach()
                 .view(self.num_envs, -1, 6),
