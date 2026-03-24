@@ -79,6 +79,7 @@ class AnymalEnv(DFlexEnv):
             no_env_offset,
         )
 
+        self.stochastic_init = stochastic_init
         self.early_termination = early_termination
         self.init_sim()
 
@@ -357,3 +358,118 @@ class AnymalEnv(DFlexEnv):
         act_penalty = self.action_penalty * torch.sum(act**2, dim=-1)
 
         return progress_rew + up_rew + heading_rew + height_rew + act_penalty
+
+    def reset(self, env_ids=None, grads=False, force_reset=False):
+        if grads:
+            """
+            This function starts collecting a new trajectory from the current states but cuts off the computation graph to the previous states.
+            It has to be called every time the algorithm starts an episode and it returns the observation vectors
+
+            Note: force_reset resets all envs and is here for compatibility with rl_games
+            """
+            self.clear_grad()
+            self.obs_buf = self.observation_from_state(self.state)
+            return self.obs_buf
+
+        if env_ids is None or force_reset:
+            # reset all environemnts
+            env_ids = torch.arange(self.num_envs, dtype=torch.long, device=self.device)
+
+        if env_ids is not None:
+            # clone the state to avoid gradient error
+            self.state.joint_q = self.state.joint_q.clone()
+            self.state.joint_qd = self.state.joint_qd.clone()
+
+            # fixed start state
+            joint_q, joint_qd = self.static_init_func(env_ids)
+            self.state.joint_q.view(self.num_envs, -1)[env_ids] = joint_q
+            self.state.joint_qd.view(self.num_envs, -1)[env_ids] = joint_qd
+
+            # randomization
+            if self.stochastic_init:
+                joint_q, joint_qd = self.stochastic_init_func(env_ids)
+                self.state.joint_q.view(self.num_envs, -1)[env_ids] = joint_q
+                self.state.joint_qd.view(self.num_envs, -1)[env_ids] = joint_qd
+
+            # clear action
+            self.state.joint_act.view(self.num_envs, -1)[env_ids, :] = 0.0
+
+            self.progress_buf[env_ids] = 0
+
+            self.obs_buf = self.observation_from_state(self.state)
+
+        extras = self._get_extras(termination=False, truncation=False)
+        return self.obs_buf, extras
+
+    def reset_with_state(self, init_joint_q, init_joint_qd, env_ids=None):
+        if env_ids is None:
+            # reset all environemnts
+            env_ids = torch.arange(self.num_envs, dtype=torch.long, device=self.device)
+
+        if env_ids is not None:
+            # fixed start state
+            self.state.joint_q = self.state.joint_q.clone()
+            self.state.joint_qd = self.state.joint_qd.clone()
+            self.state.joint_q.view(self.num_envs, -1)[env_ids, :] = init_joint_q.view(
+                -1, self.num_joint_q
+            )[env_ids, :].clone()
+            self.state.joint_qd.view(self.num_envs, -1)[env_ids, :] = (
+                init_joint_qd.view(-1, self.num_joint_qd)[env_ids, :].clone()
+            )
+
+            # clear action
+            self.state.joint_act.view(self.num_envs, -1)[env_ids, :] = 0.0
+
+            self.progress_buf[env_ids] = 0
+
+            self.obs_buf = self.observation_from_state(self.state)
+
+        extras = self._get_extras(termination=False, truncation=False)
+        return self.obs_buf, extras
+
+    def clear_grad(self, checkpoint=None):
+        """cut off the gradient from the current state to previous states"""
+
+        with torch.no_grad():
+            if checkpoint is None:
+                checkpoint = {}
+                checkpoint["joint_q"] = self.state.joint_q.clone()
+                checkpoint["joint_qd"] = self.state.joint_qd.clone()
+                checkpoint["joint_act"] = self.state.joint_act.clone()
+                checkpoint["progress_buf"] = self.progress_buf.clone()
+
+            self.state = self.model.state()
+            self.state.joint_q = checkpoint["joint_q"]
+            self.state.joint_qd = checkpoint["joint_qd"]
+            self.state.joint_act = checkpoint["joint_act"]
+            self.progress_buf = checkpoint["progress_buf"]
+
+    def _get_extras(self, termination, truncation, play=False, jac=None):
+        extras = {
+            "obs_before_reset": self.obs_buf.clone(),
+            "termination": termination,
+            "truncation": truncation,
+        }
+        if hasattr(self, "primal"):
+            extras.update({"primal": self.primal})
+
+        extras.update(
+            {
+                "joint_q": self.state.joint_q.view(self.num_envs, -1).clone().detach(),
+                "joint_qd": self.state.joint_qd.view(self.num_envs, -1)
+                .clone()
+                .detach(),
+                "contact_count": self.state.contact_count.clone().detach(),
+                "contact_forces": self.state.contact_f.clone()
+                .detach()
+                .view(self.num_envs, -1, 6),
+                "body_forces": self.state.body_f_s.clone()
+                .detach()
+                .view(self.num_envs, -1, 6),
+                "accelerations": self.state.body_a_s.clone()
+                .detach()
+                .view(self.num_envs, -1, 6),
+            }
+        )
+
+        return extras
