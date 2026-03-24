@@ -50,7 +50,7 @@ class AnymalEnv(DFlexEnv):
         early_termination=True,
         jacobian=False,
         logdir=None,
-        nan_state_fix=False,
+        nan_state_fix=True,
         jacobian_norm=None,
         termination_height=0.25,
         action_penalty=-0.005,
