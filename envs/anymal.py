@@ -45,7 +45,7 @@ class AnymalEnv(DFlexEnv):
         episode_length=1000,
         no_grad=True,
         seed=0,
-        stochastic_init=False,
+        stochastic_init=True,
         MM_caching_frequency=16,
         early_termination=True,
         jacobian=False,
